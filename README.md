@@ -1,104 +1,79 @@
-# ⏳ tiktoken
+# tiktoken-android
 
-tiktoken is a fast [BPE](https://en.wikipedia.org/wiki/Byte_pair_encoding) tokeniser for use with
-OpenAI's models.
+Run [openai/tiktoken](https://github.com/openai/tiktoken) on Android 😃
 
-```python
-import tiktoken
-enc = tiktoken.get_encoding("gpt2")
-assert enc.decode(enc.encode("hello world")) == "hello world"
+This project is based on [eisber/tiktoken](https://github.com/eisber/tiktoken), thanks his work!
 
-# To get the tokeniser corresponding to a specific model in the OpenAI API:
-enc = tiktoken.encoding_for_model("text-davinci-003")
+## Build
+
+Assume that you already installed [ndk](https://developer.android.com/studio/projects/install-ndk), [rustup](https://rustup.rs) and [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) in your computer, prefer Linux,
+
+```bash
+# Specify the path where your Android NDK is located, must be r25 or newer.
+export ANDROID_NDK_ROOT=$HOME/Android/Sdk/ndk/25.2.9519653 # or other path.
+export PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+
+# Install rust cross-compilation toolchains.
+rustup target add aarch64-linux-android
+rustup target add armv7-linux-androideabi
+rustup target add x86_64-linux-android
+rustup target add i686-linux-android
+
+# Then just run build script.
+./build.sh
 ```
 
-The open source version of `tiktoken` can be installed from PyPI:
+## Usage
+
+The build results are located at `./target` directory,
+
 ```
-pip install tiktoken
-```
-
-The tokeniser API is documented in `tiktoken/core.py`.
-
-Example code using `tiktoken` can be found in the
-[OpenAI Cookbook](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb).
-
-
-## Performance
-
-`tiktoken` is between 3-6x faster than a comparable open source tokeniser:
-
-![image](./perf.svg)
-
-Performance measured on 1GB of text using the GPT-2 tokeniser, using `GPT2TokenizerFast` from
-`tokenizers==0.13.2` and `transformers==4.24.0`.
-
-
-## Getting help
-
-Please post questions in the [issue tracker](https://github.com/openai/tiktoken/issues).
-
-If you work at OpenAI, make sure to check the internal documentation or feel free to contact
-@shantanu.
-
-
-## Extending tiktoken
-
-You may wish to extend `tiktoken` to support new encodings. There are two ways to do this.
-
-
-**Create your `Encoding` object exactly the way you want and simply pass it around.**
-
-```python
-cl100k_base = tiktoken.get_encoding("cl100k_base")
-
-# In production, load the arguments directly instead of accessing private attributes
-# See openai_public.py for examples of arguments for specific encodings
-enc = tiktoken.Encoding(
-    # If you're changing the set of special tokens, make sure to use a different name
-    # It should be clear from the name what behaviour to expect.
-    name="cl100k_im",
-    pat_str=cl100k_base._pat_str,
-    mergeable_ranks=cl100k_base._mergeable_ranks,
-    special_tokens={
-        **cl100k_base._special_tokens,
-        "<|im_start|>": 100264,
-        "<|im_end|>": 100265,
-    }
-)
+./target/aarch64-linux-android/release/lib_tiktoken_jni.so
+./target/armv7-linux-androideabi/release/lib_tiktoken_jni.so
+./target/x86_64-linux-android/release/lib_tiktoken_jni.so
+./target/i686-linux-android/release/lib_tiktoken_jni.so
 ```
 
-**Use the `tiktoken_ext` plugin mechanism to register your `Encoding` objects with `tiktoken`.**
+Just copy those `.so` files and `./java/src/main/java/tiktoken/Encoding.java` to your project,
 
-This is only useful if you need `tiktoken.get_encoding` to find your encoding, otherwise prefer
-option 1.
+and make sure your App has `android.permission.INTERNET` permission, then everything shoule be fine 🍻
 
-To do this, you'll need to create a namespace package under `tiktoken_ext`.
+Here is a example for you,
 
-Layout your project like this, making sure to omit the `tiktoken_ext/__init__.py` file:
-```
-my_tiktoken_extension
-├── tiktoken_ext
-│   └── my_encodings.py
-└── setup.py
-```
-
-`my_encodings.py` should be a module that contains a variable named `ENCODING_CONSTRUCTORS`.
-This is a dictionary from an encoding name to a function that takes no arguments and returns
-arguments that can be passed to `tiktoken.Encoding` to construct that encoding. For an example, see
-`tiktoken_ext/openai_public.py`. For precise details, see `tiktoken/registry.py`.
-
-Your `setup.py` should look something like this:
-```python
-from setuptools import setup, find_namespace_packages
-
-setup(
-    name="my_tiktoken_extension",
-    packages=find_namespace_packages(include=['tiktoken_ext*']),
-    install_requires=["tiktoken"],
-    ...
-)
+```java
+// lib_tiktoken_jni.so will download target model .tiktoken file when it first init,
+// for example https://openaipublic.blob.core.windows.net/encodings/r50k_base.tiktoken
+new Thread(() -> {
+    Encoding encoding = new Encoding("text-davinci-001");
+    long[] a = encoding.encode("test", new String[0], 0); // a = [9288].
+    encoding.close();
+}).start();
 ```
 
-Then simply `pip install ./my_tiktoken_extension` and you should be able to use your
-custom encodings! Make sure **not** to use an editable install.
+## License
 
+```
+MIT License
+
+Copyright (c) 2023 Matthew Lee
+Copyright (c) 2023 Microsoft, Markus Cozowicz
+Copyright (c) 2022 OpenAI, Shantanu Jain
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

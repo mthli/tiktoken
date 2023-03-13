@@ -1,34 +1,32 @@
 package tiktoken;
 
-import org.scijava.nativelib.NativeLoader;
-import java.io.IOException;
+import androidx.annotation.IntRange;
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 
-public class Encoding implements AutoCloseable
-{
+@Keep
+public final class Encoding implements AutoCloseable {
     static {
-        try {
-            // load from JAR
-            NativeLoader.loadLibrary("_tiktoken_jni");
-        }
-        catch(IOException e) {
-            throw new RuntimeException(e);
-        }
+        System.loadLibrary("_tiktoken_jni");
     }
 
-    // initialized by init
+    @SuppressWarnings("unused")
     private long handle;
 
-    private native void init(String modelName);
+    public Encoding(@NonNull String modelName) {
+        init(modelName);
+    }
+
+    public void close() {
+        destroy();
+    }
+
+    private native void init(@NonNull String modelName);
 
     private native void destroy();
 
-    public native long[] encode(String text, String[] allowedSpecialTokens, long maxTokenLength);
-
-    public Encoding(String modelName) {
-        this.init(modelName);
-    }
-
-    public void close() throws Exception {
-        destroy();
-    }
+    public native long[] encode(
+            @NonNull String text,
+            @NonNull String[] allowedSpecialTokens,
+            @IntRange(from = 0) long maxTokenLength);
 }
